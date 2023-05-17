@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>BB Field Sites</title>
+<title>UBC Micromet Field Sites</title>
 <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
 <link href="https://api.mapbox.com/mapbox-gl-js/v2.6.1/mapbox-gl.css" rel="stylesheet">
 <script src="https://api.mapbox.com/mapbox-gl-js/v2.6.1/mapbox-gl.js"></script>
@@ -13,296 +13,313 @@
 	body { margin: 0; padding: 0;}
 	#map { position: absolute; top: 0; bottom: 0; width: 100%;}
 	#map canvas {cursor: crosshair;}
-	#features {
-			position: absolute;
-			/* top: 0; */
-			right: 0;
-			bottom: 0;
-			width: 60%;
-			height: 10%;
-			overflow: auto;
-			background: rgba(255, 255, 255, 0.6);}
+  
+    .action_menu {
+        text-align: center;
+        background: #fff;
+        position: absolute;
+        z-index: 1;
+        bottom: 2%;
+        right: 10px;
+        border: #3887be;
+        border-radius: 3px;
+        display: flex;
+        max-height: 10%;
+        min-width: 75px;
+        max-width: 100%;
+        border: 1px solid rgba(0, 0, 0, 0.4);
+        font-family: 'Open Sans', sans-serif; 
+        }
 
-    /* Control the zoom to button */
-    .btn-control {
+    .btn {
         font: bold 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
         background-color: #3386c0;
         color: #fff;
-        position: absolute;
-        top: 20px;
-        left: 50%;
+        position: relative;
         z-index: 1;
-        border: none;
-        width: 200px;
-        margin-left: -100px;
+        border-width: 1px;
         display: block;
         cursor: pointer;
-        padding: 10px 20px;
-        border-radius: 3px;
+        padding: 8px;
+        border-color: black;
+        width: 100%;
+        /* min-width: 5%; */
     }
-    .btn-control:hover {
+    .btn:hover {
         background-color: #4ea0da;
     }
+    .btn:first-child{
+        margin-left: 0;
+    }    
+    
+    .mapboxgl-popup {
+        max-width: 1200px;
+        min-width: 500px;
+        font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+        }
+
+    table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+    td {
+        border: solid 1px #666;
+        max-width:10%;
+        word-break: break-all
+      }
+
+    #layer_menu {
+        background: #fff;
+        position: absolute;
+        z-index: 1;
+        top: 10px;
+        left: 10px;
+        border-radius: 3px;
+        width: 5%;
+        min-width: 75px;
+        border: 1px solid rgba(0, 0, 0, 0.4);
+        font-family: 'Open Sans', sans-serif;
+        }
+              
+    nav a {
+        font-size: 13px;
+        color: #404040;
+        display: block;
+        margin: 0;
+        padding: 0;
+        padding: 8px;
+        text-decoration: none;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+        text-align: center;
+        }
+        
+    nav a:last-child {
+        border: none;
+        }
+        
+    nav a:hover {
+        background-color: #f8f8f8;
+        color: #404040;
+        }
+        
+    nav a.active {
+        background-color: #3887be;
+        color: #ffffff;
+        }
+        
+    nav a.active:hover {
+        background: #3074a4;
+        }
 </style>
 </head>
+
 <body>
+<nav id="layer_menu"></nav>
 <div id="map"></div>
-<!-- Added a zoom to button -->
-<button id="zoomto" class="btn-control">Zoom to Bog</button>
-<pre id="features"></pre>
+<div class="action_menu"> 
+    <button id="readme" class="btn">View Github</button>
+</div>
+
+
+
 <pre id="json"></pre>
 <script>
-	mapboxgl.accessToken = 'pk.eyJ1IjoianVuZXNwYWNlYm9vdHMiLCJhIjoiY2twY3g4aXloMWFlcDJzbXN3aG95aG5uZiJ9.mFiJt0MIfL1MiJ2rB2xhKQ';
-    // pk.eyJ1IjoiZWN0MTIzIiwiYSI6ImNranAwN2V5cjA0OGwyc3RjMG81YmY5dzAifQ.E1gXN2BWib0Z0pnS95iOtg';
+// Replace access token!
+mapboxgl.accessToken = 'pk.eyJ1IjoidWJjbWljcm9tZXQiLCJhIjoiY2xmMnJzYzlnMGFsYTNxcW1kYWhubjBiaSJ9.rhIOVatxQoS4M__qIFv6Pg';
 
-// Location of the geojson
-// Specifying here allows for it to be more easily changed.
-// There is also an option where we could load .geojsons local storage if desired.
-const trails = 'https://raw.githubusercontent.com/June-Skeeter/FieldSiteNavigation/main/data/BB_Trails.geojson';
-const parking = 'https://raw.githubusercontent.com/June-Skeeter/FieldSiteNavigation/main/data/Parking.geojson';
-const towers = 'https://raw.githubusercontent.com/June-Skeeter/FieldSiteNavigation/main/data/FluxTowers.json';
-const chambers = 'https://raw.githubusercontent.com/June-Skeeter/FieldSiteNavigation/main/data/Chambers.geojson';
+const URL = 'https://raw.githubusercontent.com/ubc-micromet/FieldSiteMaps/main/layers/';
 
-// There isn't an explicit way to get the bounds of a geojson with GLJS
-//   - seems there should be?
-// This function allows us to:
-// Read any geojson from a URL
-async function mapData(){
-    //  fetch() retreives data from a URL
-    //   - Its an asynchronous command, returns a promise to retreive a value
-    //   - By keeping everything in the mapData() function, commands are applied the value not the promise
-    const trails_data = await fetch(trails, {
-                                headers: {
-                                'Accept': 'application/json'
-                                }
-                            });
-    const towers_data = await fetch(towers, {
-                                headers: {
-                                'Accept': 'application/json'
-                                }
-                            });
-    const chambers_data = await fetch(chambers, {
-                                headers: {
-                                'Accept': 'application/json'
-                                }
-                            });
-    const parking_data = await fetch(parking, {
-                                headers: {
-                                'Accept': 'application/json'
-                                }
-                            });
-    //  Read geojson from the fetched value
-    const trails_geoJson = await trails_data.json();
-    const towers_geoJson = await towers_data.json();
-    const chambers_geoJson = await chambers_data.json();
-    const parking_geoJson = await parking_data.json();
-    //  Turf moddule allows us to get the bounding box of a geojson 
-    let bbox = turf.extent(parking_geoJson);
-    //  fit() will fit the map to the bounding box of our geojson
-    //  Called later after map is initialized
-    function fit() {
-                    map.fitBounds(bbox, {padding: 100});
-                    }
-
-
-    const mapStyle = {
-        version: 8,
-        sources: {
-        worldImagery: {
-            type: "raster",
-            tiles: [
-            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            ],
-            tileSize: 256
+    
+//  Custom mapStyle lest us use ESRI raster tiles
+const mapStyle = {
+    version: 8,
+    sources: {
+    worldImagery: {
+        type: "raster",
+        tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+        tileSize: 256
         }
-        },
-        layers: [
-        {
-            id: "worldImagery",
-            type: "raster",
-            source: "worldImagery",
-            minzoom: 0,
-            maxzoom: 22
+    },
+    layers: [{
+        id: "worldImagery",
+        type: "raster",
+        source: "worldImagery",
+        minzoom: 0,
+        maxzoom: 22
         }
-        ]
+    ]
+};
+
+//  Create the map - zoom and center are "arbitrary"
+const map = new mapboxgl.Map({
+            container: 'map',
+            zoom: 10,
+            center: [-122.998, 49.135],
+            style: mapStyle,
+            });
+
+// map.addControl(geolocate);
+map.addControl(new mapboxgl.NavigationControl());  
+
+// Define Sites
+const SiteIds = ['BB1','BB2','BBS','DSM','RBM'];
+var Sites = [];
+for( var i = 0; i < SiteIds.length; i++ ){
+        Sites.push(SiteIds[i]+'.geojson');
+    }
+
+
+document.getElementById('readme').addEventListener('click', () => {
+        window.open('https://github.com/ubc-micromet/FieldSiteMaps');
+    });
+
+// get geojson layer from github
+async function getGeoJson(layer) {
+        const data = await fetch(layer);
+        const geojson = await data.json();
+        return geojson;
     };
 
-    //  Create the map - zoom and center are arbitrary
-    const map = new mapboxgl.Map({
-                container: 'map',
-                zoom: 4,
-                center: [-125.193328, 50.506185],
-                style: mapStyle,
-                // style: 'mapbox://styles/mapbox/satellite-v9', // style URL
-                // style: 'mapbox://styles/ect123/ck4ym048y4upi1cmzoq53immx'
-                });
-                
-    //  Fit to bbox, overwrite the center/zoom
-    fit();
+async function mapData(){
+
+    const site_data = []
+        
     //  On load - add geojson
-    map.on('load', function() {
+    map.on('load', async function() {
+        var set_vis = 'visible'
 
-    //  Add the geojsons as a map sources
-        map.addSource('Trails Layer', {
-        type: 'geojson',
-        data: trails_geoJson
-        });
-        
-        map.addSource('Towers Layer', {
+        // Add each layer as an invisible layer
+        for (var i = 0; i < SiteIds.length; i++) {
+            var layer = await getGeoJson(URL+Sites[i]);
+            site_data.push(layer);
+         
+            map.addSource(SiteIds[i], {
             type: 'geojson',
-            data: towers_geoJson
+            data: site_data[i]
             });
+            
+            if (SiteIds[i] == 'BBS'){
+                set_vis = 'none'
+            }
+            else{
+                set_vis = 'visible'
+            };
 
-        //  Add the geojson as a map source
-        map.addSource('Chambers Layer', {
-            type: 'geojson',
-            data: chambers_geoJson
-            });
-
-        map.addSource('Parking Layer', {
-        type: 'geojson',
-        data: parking_geoJson
-        });
-
-    //  Add the layer, reference the source to minimize redundancy
-
-
-    map.addLayer({
-                'id': 'Trail2',
-                'type': 'line',
-                'source': 'Trails Layer',
-                'layout': {},
-                    'paint': {
-                        'line-color': 'black',
-                        'line-width': 3
-                    },
-                });
-
-    map.addLayer({
-                'id': 'Trail',
-                'type': 'line',
-                'source': 'Trails Layer',
-                'layout': {},
-                    'paint': {
-                        'line-color': 'red',
-                        'line-width': 2
-                    },
-                });
-
-                
-    map.addLayer({
-                'id': 'Towers',
+            map.addLayer({'id': SiteIds[i],
                 'type': 'circle',
-                'source': 'Towers Layer',
-                'paint': {
-                    'circle-radius': 6,
-                    'circle-color': '#fc79fa',
-                    "circle-stroke-width": 1,
-                    "circle-stroke-color": 'black'
-                    },
-                });
-
-    map.addLayer({
-                'id': 'Chambers',
-                'type': 'circle',
-                'source': 'Chambers Layer',
-                'paint': {
-                    'circle-radius': 6,
-                    'circle-color': '#fcf879',
-                    "circle-stroke-width": 1,
-                    "circle-stroke-color": 'black'
-                    },
-                });
-
-    map.addLayer({
-                'id': 'Parking',
-                'type': 'circle',
-                'source': 'Parking Layer',
-                'paint': {
-                    'circle-radius': 6,
-                    'circle-color': '#70eefa',
-                    "circle-stroke-width": 1,
-                    "circle-stroke-color": 'black'
-                    },
-                });
-    
-    var geolocate = new mapboxgl.GeolocateControl({
-                positionOptions: {
-                enableHighAccuracy: true
+                'source': SiteIds[i],
+                'layout': {
+                    'visibility': set_vis
                 },
-                trackUserLocation: true,
-                showUserHeading: true},);
-
-    map.addControl(geolocate);
-
-    geolocate.on('geolocate', function(e) {
-        var lon = e.coords.longitude.toPrecision(8);
-        var lat = e.coords.latitude.toPrecision(7);
-        var position = [lon, lat];
-        // console.log(position);
-        document.getElementById('features').innerHTML =
-        // `e.point` is the x, y coordinates of the `mousemove` event
-        // relative to the top-left corner of the map.
-        // JSON.stringify(e.point) +
-        'Current Location:<br>' +
-        // `e.lngLat` is the longitude, latitude geographical position of the event.
-        JSON.stringify(position);
-    });
-
-
-    map.addControl(new mapboxgl.NavigationControl());
-
-    // Call fit when clicking the zoomto button
-    document.getElementById('zoomto').addEventListener('click', () => {
-        fit()
-    });
-    });
-
-    // Create an empty marker
-    const marker = new mapboxgl.Marker();
-    // Function to add the marker
-    function add_marker (event) {
-        var coordinates = event.lngLat;
-        console.log('Lng:', coordinates.lng, 'Lat:', coordinates.lat);
-        marker.setLngLat(coordinates).addTo(map);
-        }
-
-    // Display desired attributes on click
-    map.on('click', (e) => {
-        // Add the marker (show where the click is)
-        add_marker(e);
-        
-        // var lon2 = e.lngLat.longitude.toPrecision(8);
-        // var lat2 = e.lngLat.latitude.toPrecision(7);
-        // var position = lon2;
-
-        // Get features at point click
-        const features = map.queryRenderedFeatures(e.point, {layers: ['Data Layer Values']});
-         // Limit the number of properties we're displaying for legibility and performance
-        const displayProperties = [
-        'properties',
-        ];
-        
-        // Loop through the deired featrues to display
-        const displayFeatures = features.map((feat) => {
-            const displayFeat = {};
-            displayProperties.forEach((prop) => {
-                displayFeat[prop] = feat[prop];
+                'filter': ['==', '$type', 'Point'],
+                'paint': {
+                    'circle-radius': 10,
+                    'circle-color': '#f5bf42',
+                    "circle-stroke-width": 1,
+                    "circle-stroke-color": 'black'
+                    },
                 });
-                return displayFeat;
-            });
-        
-        document.getElementById('features').innerHTML =
-        'Marker Location:<br>' +        
-        JSON.stringify([e.lngLat['lng'].toPrecision(8),e.lngLat['lat'].toPrecision(7)]);
+            map.addLayer({'id': SiteIds[i]+'Trail',
+                'type': 'line',
+                'source': SiteIds[i],
+                'layout': {
+                    'visibility': 'none',
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                'filter': ['==', '$type', 'LineString'],
+                'paint': {
+                'line-color': '#0398fc',
+                'line-width': 5
+                }
+                });
+                
+            };
 
     });
 
     
+    map.on('idle', () => {
+        // Set up the corresponding toggle button for each layer.
+        for (const id of SiteIds) {
+        // Skip layers that already have a button set up.
+            if (document.getElementById(id)) {
+            continue;
+            }
+                // Create a link.
+                const link = document.createElement('a');
+                link.id = id;
+                link.href = '#';
+                link.textContent = id;
+                // Show or hide layer when the toggle is clicked.
+                link.onclick = function (e) {
+                    const clickedLayer = this.textContent;
+                    e.preventDefault();
+                    e.stopPropagation();    
+                    const visibility = map.getLayoutProperty(
+                        clickedLayer,
+                        'visibility'
+                        );
+                
+                    // Toggle layer visibility by changing the layout object's visibility property.
+                    if (visibility === 'visible') {
+                        map.setLayoutProperty(clickedLayer, 'visibility', 'none');
+                        map.setLayoutProperty(clickedLayer+'Trail', 'visibility', 'none');
+                        this.className = '';
+                        } 
+                        else {
+                        idx = SiteIds.indexOf(clickedLayer)
 
+                        let bbox = turf.extent(site_data[idx]);
 
+                        // fit zom to the bounding box of whichever layers are loaded
+                        function fit() {
+                            map.fitBounds(bbox, {maxZoom: 15});
+                            };
+            
+                        fit();
+                        this.className = 'active';
+                        map.setLayoutProperty(clickedLayer,'visibility','visible');
+                        map.setLayoutProperty(clickedLayer+'Trail','visibility','visible');
+                        }
+                };
 
+            const layers = document.getElementById('layer_menu');
+            layers.appendChild(link);
+            };
+        }  
+    );
 
+    map.on('click', SiteIds, (e) => {
+        // Copy coordinates array.
+        var coordinates = [0,0]
+        if (e.features[0].geometry.coordinates[0].constructor === Array){ 
+            coordinates = e.features[0].geometry.coordinates[0].slice();
+        }
+        else{
+            coordinates = e.features[0].geometry.coordinates.slice();
+        };
+        console.log(coordinates)
+        const description = '<table style="table-layout: fixed; width:100%; font-size:1.25em"><tr><th style="width:30%"></th><th></th></tr>'+
+        '<tr><td><b>Site Name</b></td><td>'+e.features[0].properties.Name+'</td></tr>'+
+        '<tr><td><b>Site Description</b></td><td style="word-break: normal">'+e.features[0].properties.Description+'</td></tr>'+
+        '<tr><td><b>View Web Plot</b></td><td><a href='+e.features[0].properties.WebPlot+' target="_blank">Click Here</a></td></tr>'+
+        '</table>';
+        
+        // Ensure that if the map is zoomed out such that multiple
+        // copies of the feature are visible, the popup appears
+        // over the copy being pointed to.
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+        coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+        }
+        
+        new mapboxgl.Popup()
+        .setLngLat(coordinates)
+        .setHTML(description)
+        .addTo(map);
+        });
+
+            
 };
 
 // Call mapData() to initalize the map
